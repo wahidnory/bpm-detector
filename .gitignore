@@ -1,0 +1,11 @@
+# Build output - publish installers as GitHub Release assets instead
+installer/Output/
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

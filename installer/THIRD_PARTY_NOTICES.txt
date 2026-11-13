@@ -1,0 +1,26 @@
+BPM Overlay - third-party software notices
+==========================================
+
+BPM Overlay includes the following third-party components. Full licence
+texts are in the "licenses" folder next to this file.
+
+Python 3.12 runtime (incl. Tkinter)
+  Python Software Foundation License        licenses\Python-LICENSE.txt
+
+Tcl/Tk
+  BSD-style licence                         licenses\Tcl-Tk-license.terms.txt
+
+NumPy
+  BSD 3-Clause licence (bundled sub-components listed in the NumPy licence
+  files under _internal\numpy-*.dist-info\licenses)
+                                            licenses\NumPy-LICENSE.txt
+
+PyAudioWPatch (incl. PortAudio and PyAudio)
+  Apache License 2.0                        licenses\PyAudioWPatch-LICENSE.txt
+  https://github.com/s0d3s/PyAudioWPatch
+  PortAudio: MIT-style licence, http://www.portaudio.com/license.html
+  PyAudio:   MIT licence
+
+PyInstaller bootloader
+  GPL 2.0 with a special exception permitting distribution of bundled
+  applications under any licence            licenses\PyInstaller-COPYING.txt
