@@ -4,6 +4,10 @@ A small always-on-top window for Windows that shows the BPM of whatever your PC 
 browser, Spotify, Beatport/Bandcamp/SoundCloud previews, DJ software. Use it while digging
 for music to see straight away whether a track fits the tempo range of your set.
 
+<p align="center">
+  <img src="docs/overlay.png" alt="BPM Overlay showing 123.0 BPM, locked, in amber: pitch +0.8% to fit a 124-130 target range" width="198">
+</p>
+
 - **Green**: the track is inside your target range
 - **Amber**: a pitch-fader nudge brings it in, and the overlay says how much (e.g. `pitch +2.1% to fit`)
 - **Red**: out of range, with a hint when half or double the tempo would fit
