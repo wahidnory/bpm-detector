@@ -21,7 +21,7 @@ import threading
 import time
 import tkinter as tk
 from collections import deque
-from tkinter import simpledialog
+
 
 import numpy as np
 
@@ -40,17 +40,35 @@ DEFAULTS = {"min_bpm": 124.0, "max_bpm": 130.0, "pitch_pct": 6.0, "x": 60, "y": 
             "device": ""}  # "" = follow the Windows default output
 FOLLOW_DEFAULT = "__follow_default__"  # menu value for "Follow Windows default"
 
-APP_VERSION = "1.1.3"
+APP_VERSION = "1.1.4"
 
 WINDOW_SEC = 10.0      # seconds of audio analysed per estimate
 UPDATE_MS = 750        # how often the estimate is refreshed
 SILENCE_RMS = 1e-3     # below this the output is considered silent
 
 
+def parse_range(text):
+    """'124-130', '124 - 130', '124–130', '124 to 130', '128' -> (lo, hi); None if invalid."""
+    t = text.strip().lower()
+    for sep in ("–", "—", " to ", "/"):
+        t = t.replace(sep, "-")
+    parts = [p.strip().replace(",", ".") for p in t.split("-") if p.strip()]
+    if not 1 <= len(parts) <= 2:
+        return None
+    try:
+        vals = [float(p) for p in parts]
+    except ValueError:
+        return None
+    lo, hi = min(vals), max(vals)
+    if lo < 40 or hi > 250:
+        return None
+    return lo, hi
+
+
 def load_settings():
     s = dict(DEFAULTS)
     try:
-        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+        with open(SETTINGS_FILE, "r", encoding="utf-8-sig") as f:
             s.update(json.load(f))
     except Exception:
         pass
@@ -459,24 +477,85 @@ class Overlay:
         self._render()
 
     def _ask_range(self):
-        cur = f"{self.s['min_bpm']:g}-{self.s['max_bpm']:g}"
-        self._busy += 1
-        try:
-            ans = simpledialog.askstring("Target BPM range", "Range (e.g. 124-130, or 128 for a single tempo):",
-                                         initialvalue=cur, parent=self.root)
-        finally:
-            self._busy -= 1
-        if not ans:
+        # Menu commands run while the popup menu's modal loop is still active on
+        # Windows; a dialog opened right here gets its clicks/Enter eaten by the
+        # menu. Open it once the menu has fully closed.
+        self.root.after(50, self._open_range_dialog)
+
+    def _open_range_dialog(self):
+        win = getattr(self, "_range_win", None)
+        if win is not None and win.winfo_exists():
+            win.lift()
+            win.focus_force()
             return
+
+        w = tk.Toplevel(self.root)
+        self._range_win = w
+        self._busy += 1
+        closed = [False]
+
+        w.title("Target BPM range")
+        w.resizable(False, False)
+        w.attributes("-topmost", True)  # the overlay is topmost; so must its dialog be
         try:
-            parts = [float(p) for p in ans.replace(" ", "").replace("–", "-").split("-") if p]
-            lo, hi = (parts[0], parts[0]) if len(parts) == 1 else (min(parts[:2]), max(parts[:2]))
-            self.s["min_bpm"], self.s["max_bpm"] = lo, hi
-            save_settings(self.s)
-            self._reset()
-            self._update_range_label()
+            base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+            w.iconbitmap(os.path.join(base, "bpm_overlay.ico"))
         except Exception:
             pass
+
+        frm = tk.Frame(w, padx=14, pady=12)
+        frm.pack(fill="both", expand=True)
+        tk.Label(frm, text="Target range, e.g. 124-130 (or 128 for one tempo):").pack(anchor="w")
+        var = tk.StringVar(value=f"{self.s['min_bpm']:g}-{self.s['max_bpm']:g}")
+        entry = tk.Entry(frm, textvariable=var, width=18, font=("Segoe UI", 11))
+        entry.pack(fill="x", pady=(6, 2))
+        err = tk.Label(frm, text="", fg=RED)
+        err.pack(anchor="w")
+        btns = tk.Frame(frm)
+        btns.pack(fill="x", pady=(6, 0))
+
+        def close(_=None):
+            if closed[0]:
+                return
+            closed[0] = True
+            self._busy -= 1
+            w.destroy()
+
+        def ok(_=None):
+            rng = parse_range(var.get())
+            if rng is None:
+                err.config(text="Use a number or range between 40 and 250, e.g. 124-130")
+                entry.focus_set()
+                entry.select_range(0, "end")
+                return
+            self.s["min_bpm"], self.s["max_bpm"] = rng
+            save_settings(self.s)
+            close()
+            self._reset()
+            self._update_range_label()
+
+        tk.Button(btns, text="Cancel", width=9, command=close).pack(side="right")
+        tk.Button(btns, text="OK", width=9, command=ok, default="active").pack(side="right", padx=(0, 6))
+        for seq in ("<Return>", "<KP_Enter>"):
+            w.bind(seq, ok)
+        w.bind("<Escape>", close)
+        w.protocol("WM_DELETE_WINDOW", close)
+
+        # Place it next to the overlay, kept on screen
+        w.update_idletasks()
+        ww, wh = w.winfo_reqwidth(), w.winfo_reqheight()
+        sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
+        x = self.root.winfo_x() - ww - 10
+        if x < 0:
+            x = self.root.winfo_x() + self.root.winfo_width() + 10
+        y = self.root.winfo_y()
+        w.geometry(f"+{max(0, min(x, sw - ww))}+{max(0, min(y, sh - wh - 40))}")
+
+        w.lift()
+        w.focus_force()
+        entry.focus_set()
+        entry.select_range(0, "end")
+        entry.icursor("end")
 
     def _set_pitch(self):
         self.s["pitch_pct"] = float(self.pitch_var.get())
